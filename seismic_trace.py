@@ -95,4 +95,5 @@ axes[1].set_ylabel("Amplitude")
 axes[1].grid(True, alpha=0.3)
 
 figure.tight_layout()
+figure.savefig("figures/synthetic_trace.png", dpi=300, bbox_inches='tight')
 plt.show()
