@@ -44,6 +44,22 @@ def create_reflectivity_series(duration, dt, reflection_times, reflection_coeffi
 
     return time, reflectivity
 
+def add_white_noise(signal, snr_db, seed=None):
+    """Add white Gaussian noise to a signal based on a specified SNR in dB"""
+
+    random_generator = np.random.default_rng(seed) # Use a random generator for reproducibility
+
+    signal_power = np.mean(signal ** 2)  
+
+    noise_power = signal_power / (10 ** (snr_db / 10))
+    noise_standard_deviation = np.sqrt(noise_power)
+
+    noise = random_generator.normal(loc=0.0, scale=noise_standard_deviation, size=signal.shape)
+
+    noisy_signal = signal + noise
+
+    return noisy_signal, noise
+
 #Reflectivity series parameters
 duration = 1.0  # Duration of the reflectivity series in seconds
 
@@ -57,7 +73,14 @@ trace_time, reflectivity_series = create_reflectivity_series(duration, sampling_
 synthetic_trace = np.convolve(reflectivity_series, wavelet, mode='same') #mode='same' 
 #ensures the output (synthetic_trace) has the same length as the input reflectivity series
 
+# Add noise to the synthetic trace
+target_snr_db = 10.0 #SNR in dB
 
+noisy_trace, noise = add_white_noise(synthetic_trace, target_snr_db, seed=42)
+
+actual_snr_db = 10 * np.log10(np.mean(synthetic_trace ** 2) / np.mean(noise ** 2)) #Calculate the SNR actually obtained
+print(f"Target SNR: {target_snr_db:.2f} dB") 
+print(f"Actual SNR: {actual_snr_db:.2f} dB")
 
 #Plot the wavelet
 plt.figure(figsize=(10, 5))
@@ -96,4 +119,19 @@ axes[1].grid(True, alpha=0.3)
 
 figure.tight_layout()
 figure.savefig("figures/synthetic_trace.png", dpi=300, bbox_inches='tight')
+
+noise_figure, noise_axes = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
+noise_axes[0].plot(trace_time * 1000, synthetic_trace, color='darkred')
+noise_axes[1].plot(trace_time * 1000, noisy_trace, label='Noise', color='steelblue')
+noise_axes[0].set_title("Clean Synthetic Trace")
+noise_axes[0].set_ylabel("Amplitude")
+noise_axes[0].grid(True, alpha=0.3)
+noise_axes[1].set_title(f"Noisy Synthetic Trace - SNR = {target_snr_db:.0f} dB")
+noise_axes[1].set_xlabel("Two-way time (ms)")
+noise_axes[1].set_ylabel("Amplitude")
+noise_axes[1].grid(True, alpha=0.3)
+
+noise_figure.tight_layout()
+
+noise_figure.savefig("figures/noise_comparison.png", dpi=300, bbox_inches='tight')
 plt.show()
