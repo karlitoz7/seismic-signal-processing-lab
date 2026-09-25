@@ -60,6 +60,24 @@ def add_white_noise(signal, snr_db, seed=None):
 
     return noisy_signal, noise
 
+def amplitude_spectrum(signal, dt):
+    """Calculate the one-sided amplitude spectrum of a signal"""
+
+    n_samples = len(signal)
+
+    frequencies = np.fft.rfftfreq(n_samples, dt)
+
+    complex_spectrum = np.fft.rfft(signal)
+    amplitude = np.abs(complex_spectrum) / n_samples
+
+    #Convert to a one-sided amplitude spectrum
+    if n_samples % 2 == 0:  # Even number of samples
+        amplitude[1:-1] *= 2
+    else:  # Odd number of samples
+        amplitude[1:] *= 2
+
+        return frequencies, amplitude
+    
 #Reflectivity series parameters
 duration = 1.0  # Duration of the reflectivity series in seconds
 
@@ -77,6 +95,17 @@ synthetic_trace = np.convolve(reflectivity_series, wavelet, mode='same') #mode='
 target_snr_db = 10.0 #SNR in dB
 
 noisy_trace, noise = add_white_noise(synthetic_trace, target_snr_db, seed=42)
+
+#Calculate the amplitude spectra of the three signals
+wavelet_frequencies, wavelet_amplitude = amplitude_spectrum(wavelet, sampling_interval)
+clean_frequencies, clean_amplitude = amplitude_spectrum(synthetic_trace, sampling_interval)
+noisy_frequencies, noisy_amplitude = amplitude_spectrum(noisy_trace, sampling_interval)
+
+#Estimate the wavelet's dominant freuency 
+peak_index = np.argmax(wavelet_amplitude[1:]) + 1  # Exclude the DC component at index 0
+measured_dominant_frequency = wavelet_frequencies[peak_index]
+
+print(f"Measured dominant frequency of the wavelet: {measured_dominant_frequency:.2f} Hz")
 
 actual_snr_db = 10 * np.log10(np.mean(synthetic_trace ** 2) / np.mean(noise ** 2)) #Calculate the SNR actually obtained
 print(f"Target SNR: {target_snr_db:.2f} dB") 
@@ -134,4 +163,30 @@ noise_axes[1].grid(True, alpha=0.3)
 noise_figure.tight_layout()
 
 noise_figure.savefig("figures/noise_comparison.png", dpi=300, bbox_inches='tight')
+
+spectrum_figure, spectrum_axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+
+#Wavelet spectrum
+spectrum_axes[0].plot(wavelet_frequencies, wavelet_amplitude, color='purple', linewidth=2, label='Ricker Wavelet')
+spectrum_axes[0].axvline(dom_freq, color='black', linestyle='--', alpha=0.7, label=f"{dom_freq} Hz")
+spectrum_axes[0].set_title("Amplitude Spectrum of Ricker Wavelet")
+spectrum_axes[0].set_ylabel("Amplitude")
+spectrum_axes[0].legend()
+spectrum_axes[0].grid(True, alpha=0.3)
+
+
+#Clean and noisy trace spectra
+spectrum_axes[1].plot(clean_frequencies, clean_amplitude, color='orange', linewidth=2, label='Clean Synthetic Trace')
+spectrum_axes[1].plot(noisy_frequencies, noisy_amplitude, color='steelblue', linewidth=2, label='Noisy Synthetic Trace')
+spectrum_axes[1].set_title("Amplitude Spectra of Synthetic Traces")
+spectrum_axes[1].set_xlabel("Frequency (Hz)")
+spectrum_axes[1].set_ylabel("Amplitude")
+spectrum_axes[1].set_xlim(0, 100)
+spectrum_axes[1].legend()
+spectrum_axes[1].grid(True, alpha=0.3)
+
+spectrum_figure.tight_layout()
+
+spectrum_figure.savefig("figures/amplitude_spectra.png", dpi=300, bbox_inches='tight')
+
 plt.show()
